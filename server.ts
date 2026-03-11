@@ -72,9 +72,8 @@ app.post("/api/ssh/connect", authenticate, async (req: any, res) => {
   
   try {
     // Test connection
-    const sftp = new LogService();
-    // We just try to list / to verify connection
-    await sftp.listLogs(config, "/"); 
+    const logService = new LogService();
+    await logService.testConnection(config);
     
     // Store config in session (In production, encrypt this!)
     req.session.sshConfig = config;

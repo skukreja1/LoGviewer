@@ -12,41 +12,39 @@ export interface SSHConfig {
 }
 
 export class LogService {
-  private sftp: Client;
-
-  constructor() {
-    this.sftp = new Client();
-  }
-
-  private async connect(config: SSHConfig) {
-    await this.sftp.connect({
+  private async createClient(config: SSHConfig) {
+    const sftp = new Client();
+    await sftp.connect({
       host: config.host,
       port: config.port,
       username: config.username,
       password: config.password,
       privateKey: config.privateKey,
       passphrase: config.passphrase,
-      readyTimeout: 10000,
+      readyTimeout: 15000, // Increased timeout
     });
+    return sftp;
+  }
+
+  async testConnection(config: SSHConfig) {
+    const sftp = await this.createClient(config);
+    try {
+      return true;
+    } finally {
+      await sftp.end();
+    }
   }
 
   async listLogs(config: SSHConfig, baseDir: string = '/u01/app/oracle/orpos') {
+    const sftp = await this.createClient(config);
     try {
-      await this.connect(config);
-      
-      // Recursive list is heavy, let's do a controlled depth or just flat for now
-      // but the requirement says "Recursively scans /var/log"
-      // ssh2-sftp-client has a list method but not recursive by default
-      
       const files: any[] = [];
       
       const scan = async (dir: string) => {
-        const list = await this.sftp.list(dir);
+        const list = await sftp.list(dir);
         for (const item of list) {
           const fullPath = path.posix.join(dir, item.name);
           if (item.type === 'd') {
-            // Avoid infinite loops or too deep recursion for demo
-            // In production, we'd limit this
             try {
               await scan(fullPath);
             } catch (e) {
@@ -74,29 +72,19 @@ export class LogService {
       await scan(baseDir);
       return files;
     } finally {
-      await this.sftp.end();
+      await sftp.end();
     }
   }
 
   async getPreview(config: SSHConfig, filePath: string, lines: number = 200) {
-    const sftp = new Client();
+    const sftp = await this.createClient(config);
     try {
-      await sftp.connect({
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        password: config.password,
-        privateKey: config.privateKey,
-        passphrase: config.passphrase,
-      });
-
       const stats = await sftp.stat(filePath);
       const size = stats.size;
       
       if (size === 0) return "";
 
       // Read the last 16KB of the file as a heuristic for 200 lines
-      // If the file is smaller, read from the beginning
       const readSize = Math.min(size, 16384); 
       const start = size - readSize;
       const end = size - 1;
@@ -104,7 +92,6 @@ export class LogService {
       const buffer = await sftp.get(filePath, undefined, { start, end });
       const content = buffer.toString('utf8');
       
-      // Split by lines and take the last N
       const allLines = content.split(/\r?\n/);
       return allLines.slice(-lines).join('\n');
     } finally {
@@ -113,21 +100,10 @@ export class LogService {
   }
 
   async getFileStream(config: SSHConfig, filePath: string) {
-    const sftp = new Client();
-    await sftp.connect({
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        password: config.password,
-        privateKey: config.privateKey,
-        passphrase: config.passphrase,
-    });
+    const sftp = await this.createClient(config);
     
-    // We need to return the stream and ensure connection closes after stream ends
-    // This is tricky with ssh2-sftp-client's get() which returns a stream or buffer
     const stream = await sftp.get(filePath);
     
-    // Wrap stream to close sftp on end
     if (typeof stream !== 'string' && !(stream instanceof Buffer)) {
         stream.on('end', () => sftp.end());
         stream.on('error', () => sftp.end());

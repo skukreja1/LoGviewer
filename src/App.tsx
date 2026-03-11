@@ -107,10 +107,11 @@ export default function App() {
         setIsConnected(true);
         fetchLogs();
       } else {
-        setError(data.error);
+        const msg = data.error || 'Unknown connection error';
+        setError(`Connection failed: ${msg}. Please check your host, port, and credentials.`);
       }
     } catch (err) {
-      setError('SSH Connection failed');
+      setError('SSH Connection failed: Network error or server unreachable from this environment.');
     } finally {
       setLoading(false);
     }
