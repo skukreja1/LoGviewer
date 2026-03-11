@@ -38,38 +38,16 @@ export class LogService {
   async listLogs(config: SSHConfig, baseDir: string = '/u01/app/oracle/orpos') {
     const sftp = await this.createClient(config);
     try {
-      const files: any[] = [];
+      const list = await sftp.list(baseDir);
+      const files = list
+        .filter(item => item.type !== 'd') // Only include files, not directories
+        .map(item => ({
+          name: item.name,
+          path: path.posix.join(baseDir, item.name),
+          size: item.size,
+          modifyTime: item.modifyTime,
+        }));
       
-      const scan = async (dir: string) => {
-        const list = await sftp.list(dir);
-        for (const item of list) {
-          const fullPath = path.posix.join(dir, item.name);
-          if (item.type === 'd') {
-            try {
-              await scan(fullPath);
-            } catch (e) {
-              // Skip directories we can't access
-            }
-          } else {
-            // Check if it's a log file
-            const isLog = item.name.endsWith('.log') || 
-                          item.name.endsWith('.out') || 
-                          item.name.endsWith('.txt') || 
-                          !item.name.includes('.');
-            
-            if (isLog) {
-              files.push({
-                name: item.name,
-                path: fullPath,
-                size: item.size,
-                modifyTime: item.modifyTime,
-              });
-            }
-          }
-        }
-      };
-
-      await scan(baseDir);
       return files;
     } finally {
       await sftp.end();
