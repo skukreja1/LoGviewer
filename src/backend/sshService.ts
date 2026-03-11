@@ -79,28 +79,9 @@ export class LogService {
   }
 
   async getPreview(config: SSHConfig, filePath: string, lines: number = 200) {
-    return new Promise<string>((resolve, reject) => {
-      const conn = new SSHClient();
-      conn.on('ready', () => {
-        // Use 'tail' command for preview
-        conn.exec(`tail -n ${lines} "${filePath}"`, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject(err);
-          }
-          let data = '';
-          stream.on('data', (chunk: Buffer) => {
-            data += chunk.toString();
-          }).on('close', () => {
-            conn.end();
-            resolve(data);
-          }).stderr.on('data', (data: Buffer) => {
-            console.error('STDERR: ' + data);
-          });
-        });
-      }).on('error', (err) => {
-        reject(err);
-      }).connect({
+    const sftp = new Client();
+    try {
+      await sftp.connect({
         host: config.host,
         port: config.port,
         username: config.username,
@@ -108,7 +89,24 @@ export class LogService {
         privateKey: config.privateKey,
         passphrase: config.passphrase,
       });
-    });
+
+      const stats = await sftp.stat(filePath);
+      const size = stats.size;
+      
+      // Read the last 16KB of the file as a heuristic for 200 lines
+      // If the file is smaller, read from the beginning
+      const readSize = Math.min(size, 16384); 
+      const start = size - readSize;
+
+      const buffer = await sftp.get(filePath, undefined, { start, end: size });
+      const content = buffer.toString('utf8');
+      
+      // Split by lines and take the last N
+      const allLines = content.split(/\r?\n/);
+      return allLines.slice(-lines).join('\n');
+    } finally {
+      await sftp.end();
+    }
   }
 
   async getFileStream(config: SSHConfig, filePath: string) {

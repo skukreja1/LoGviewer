@@ -379,6 +379,9 @@ export default function App() {
               </div>
             </form>
           </motion.div>
+          <div className="mt-8 bg-white/50 border border-[#141414]/10 p-4 text-[10px] font-bold uppercase tracking-widest opacity-50">
+            Note: This explorer works with any server supporting SFTP (Linux, macOS, Windows with OpenSSH).
+          </div>
         </div>
       </div>
     );
