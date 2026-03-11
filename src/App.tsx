@@ -60,7 +60,7 @@ export default function App() {
   const [previewFile, setPreviewFile] = useState<LogFile | null>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [baseDir, setBaseDir] = useState('/var/log');
+  const [baseDir, setBaseDir] = useState('/u01/app/oracle/orpos');
 
   // Check auth on mount
   useEffect(() => {

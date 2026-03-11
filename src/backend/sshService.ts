@@ -30,7 +30,7 @@ export class LogService {
     });
   }
 
-  async listLogs(config: SSHConfig, baseDir: string = '/var/log') {
+  async listLogs(config: SSHConfig, baseDir: string = '/u01/app/oracle/orpos') {
     try {
       await this.connect(config);
       
@@ -43,7 +43,7 @@ export class LogService {
       const scan = async (dir: string) => {
         const list = await this.sftp.list(dir);
         for (const item of list) {
-          const fullPath = path.join(dir, item.name);
+          const fullPath = path.posix.join(dir, item.name);
           if (item.type === 'd') {
             // Avoid infinite loops or too deep recursion for demo
             // In production, we'd limit this
@@ -93,12 +93,15 @@ export class LogService {
       const stats = await sftp.stat(filePath);
       const size = stats.size;
       
+      if (size === 0) return "";
+
       // Read the last 16KB of the file as a heuristic for 200 lines
       // If the file is smaller, read from the beginning
       const readSize = Math.min(size, 16384); 
       const start = size - readSize;
+      const end = size - 1;
 
-      const buffer = await sftp.get(filePath, undefined, { start, end: size });
+      const buffer = await sftp.get(filePath, undefined, { start, end });
       const content = buffer.toString('utf8');
       
       // Split by lines and take the last N

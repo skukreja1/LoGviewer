@@ -1,5 +1,5 @@
 {
   "name": "Secure Log Explorer",
-  "description": "A secure web application to connect to remote servers, list log files, and download them individually or as a ZIP archive.",
+  "description": "A secure web application to connect to remote servers, list log files from /u01/app/oracle/orpos, and download them individually or as a ZIP archive.",
   "requestFramePermissions": []
 }

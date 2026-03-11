@@ -93,7 +93,7 @@ app.get("/api/logs", authenticate, async (req: any, res) => {
   const sshConfig = req.session.sshConfig;
   if (!sshConfig) return res.status(400).json({ error: "No active SSH connection" });
 
-  const baseDir = (req.query.path as string) || "/var/log";
+  const baseDir = (req.query.path as string) || "/u01/app/oracle/orpos";
   
   // Security: Basic path validation
   // In a real app, we'd be more strict about allowed base directories
@@ -137,7 +137,7 @@ app.get("/api/download-file", authenticate, async (req: any, res) => {
 
   try {
     const stream = await logService.getFileStream(sshConfig, filePath);
-    res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${path.posix.basename(filePath)}"`);
     
     if (stream instanceof Buffer) {
         res.send(stream);
@@ -176,7 +176,7 @@ app.post("/api/download-zip", authenticate, async (req: any, res) => {
   try {
     for (const filePath of paths) {
       const stream = await logService.getFileStream(sshConfig, filePath);
-      archive.append(stream as any, { name: path.basename(filePath) });
+      archive.append(stream as any, { name: path.posix.basename(filePath) });
     }
     await archive.finalize();
   } catch (err: any) {
