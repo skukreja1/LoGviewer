@@ -30,6 +30,7 @@ interface LogFile {
   path: string;
   size: number;
   modifyTime: number;
+  type: 'file' | 'directory';
 }
 
 interface SSHConfig {
@@ -117,14 +118,16 @@ export default function App() {
     }
   };
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (pathOverride?: string) => {
     setLoading(true);
     setError(null);
+    const targetPath = pathOverride || baseDir;
     try {
-      const res = await fetch(`/api/logs?path=${encodeURIComponent(baseDir)}`);
+      const res = await fetch(`/api/logs?path=${encodeURIComponent(targetPath)}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setLogs(data);
+        if (pathOverride) setBaseDir(pathOverride);
       } else {
         setError(data.error);
       }
@@ -132,6 +135,19 @@ export default function App() {
       setError('Failed to fetch logs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFolderClick = (path: string) => {
+    fetchLogs(path);
+  };
+
+  const handleGoBack = () => {
+    const parts = baseDir.split('/').filter(Boolean);
+    if (parts.length > 0) {
+      parts.pop();
+      const parentPath = '/' + parts.join('/');
+      fetchLogs(parentPath || '/');
     }
   };
 
@@ -437,17 +453,27 @@ export default function App() {
         <div className="max-w-7xl mx-auto">
           {/* Controls */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-4 bg-white border border-[#141414] p-2 pr-4">
-              <div className="bg-[#141414] text-white p-2">
-                <Folder size={18} />
+            <div className="flex items-center gap-2 flex-1">
+              <button 
+                onClick={handleGoBack}
+                disabled={baseDir === '/' || loading}
+                className="bg-white border border-[#141414] p-3 hover:bg-gray-100 disabled:opacity-30"
+                title="Go Back"
+              >
+                <ChevronRight className="rotate-180" size={18} />
+              </button>
+              <div className="flex items-center gap-4 bg-white border border-[#141414] p-2 pr-4 flex-1">
+                <div className="bg-[#141414] text-white p-2">
+                  <Folder size={18} />
+                </div>
+                <input 
+                  type="text" 
+                  className="focus:outline-none font-mono text-sm w-full"
+                  value={baseDir}
+                  onChange={e => setBaseDir(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && fetchLogs()}
+                />
               </div>
-              <input 
-                type="text" 
-                className="focus:outline-none font-mono text-sm w-64"
-                value={baseDir}
-                onChange={e => setBaseDir(e.target.value)}
-                onBlur={fetchLogs}
-              />
             </div>
 
             <div className="flex items-center gap-4">
@@ -493,35 +519,58 @@ export default function App() {
                     className={`grid grid-cols-[48px_1fr_120px_180px_120px] items-center p-4 hover:bg-orange-50 transition-colors group ${selectedPaths.has(log.path) ? 'bg-orange-50/50' : ''}`}
                   >
                     <div className="flex items-center justify-center">
-                      <button onClick={() => toggleSelect(log.path)}>
-                        {selectedPaths.has(log.path) ? <CheckSquare size={16} className="text-orange-600" /> : <Square size={16} className="opacity-20 group-hover:opacity-100" />}
-                      </button>
+                      {log.type === 'file' ? (
+                        <button onClick={() => toggleSelect(log.path)}>
+                          {selectedPaths.has(log.path) ? <CheckSquare size={16} className="text-orange-600" /> : <Square size={16} className="opacity-20 group-hover:opacity-100" />}
+                        </button>
+                      ) : (
+                        <Folder size={16} className="opacity-30" />
+                      )}
                     </div>
                     <div className="overflow-hidden">
-                      <div className="font-bold text-sm truncate">{log.name}</div>
-                      <div className="text-[10px] font-mono opacity-40 truncate">{log.path}</div>
+                      {log.type === 'directory' ? (
+                        <button 
+                          onClick={() => handleFolderClick(log.path)}
+                          className="flex items-center gap-3 hover:text-orange-600 transition-colors text-left w-full"
+                        >
+                          <Folder size={18} className="text-orange-400 shrink-0" />
+                          <div className="truncate font-bold">{log.name}</div>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <FileText size={18} className="text-blue-400 shrink-0" />
+                          <div className="truncate">
+                            <div className="font-bold">{log.name}</div>
+                            <div className="text-[10px] opacity-40 font-mono truncate">{log.path}</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="text-right font-mono text-xs opacity-60">
-                      {formatSize(log.size)}
+                      {log.type === 'directory' ? '--' : `${(log.size / 1024).toFixed(1)} KB`}
                     </div>
-                    <div className="text-center text-[10px] opacity-60">
+                    <div className="text-center text-xs opacity-60">
                       {new Date(log.modifyTime).toLocaleString()}
                     </div>
                     <div className="flex items-center justify-center gap-2">
-                      <button 
-                        onClick={() => handlePreview(log)}
-                        className="p-2 hover:bg-white border border-transparent hover:border-[#141414] transition-all"
-                        title="Preview"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button 
-                        onClick={() => downloadFile(log.path)}
-                        className="p-2 hover:bg-white border border-transparent hover:border-[#141414] transition-all"
-                        title="Download"
-                      >
-                        <Download size={16} />
-                      </button>
+                      {log.type === 'file' && (
+                        <>
+                          <button 
+                            onClick={() => handlePreview(log)}
+                            className="p-2 hover:bg-[#141414] hover:text-white transition-all"
+                            title="Preview"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button 
+                            onClick={() => downloadFile(log.path)}
+                            className="p-2 hover:bg-[#141414] hover:text-white transition-all"
+                            title="Download"
+                          >
+                            <Download size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))

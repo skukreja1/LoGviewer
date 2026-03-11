@@ -39,16 +39,21 @@ export class LogService {
     const sftp = await this.createClient(config);
     try {
       const list = await sftp.list(baseDir);
-      const files = list
-        .filter(item => item.type !== 'd') // Only include files, not directories
-        .map(item => ({
-          name: item.name,
-          path: path.posix.join(baseDir, item.name),
-          size: item.size,
-          modifyTime: item.modifyTime,
-        }));
+      const items = list.map(item => ({
+        name: item.name,
+        path: path.posix.join(baseDir, item.name),
+        size: item.size,
+        modifyTime: item.modifyTime,
+        type: item.type === 'd' ? 'directory' : 'file',
+      }));
       
-      return files;
+      // Sort: directories first, then files, both alphabetically
+      return items.sort((a, b) => {
+        if (a.type === b.type) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.type === 'directory' ? -1 : 1;
+      });
     } finally {
       await sftp.end();
     }
