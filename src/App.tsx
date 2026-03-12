@@ -16,7 +16,8 @@ import {
   Loader2,
   AlertCircle,
   X,
-  Eye
+  Eye,
+  Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -62,16 +63,21 @@ export default function App() {
   const [previewFile, setPreviewFile] = useState<LogFile | null>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [baseDir, setBaseDir] = useState('/u01/app/oracle/orpos');
+  const [baseDir, setBaseDir] = useState('/');
 
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [serverCwd, setServerCwd] = useState<string>('/');
 
   // Check auth and server health on mount
   useEffect(() => {
     const checkHealth = async () => {
       try {
         const res = await fetch('/api/health');
-        if (res.ok) setServerStatus('online');
+        if (res.ok) {
+          const data = await res.json();
+          setServerStatus('online');
+          if (data.cwd) setServerCwd(data.cwd);
+        }
         else setServerStatus('offline');
       } catch {
         setServerStatus('offline');
@@ -541,6 +547,14 @@ export default function App() {
                 title="Go Back"
               >
                 <ChevronRight className="rotate-180" size={18} />
+              </button>
+              <button 
+                onClick={() => fetchLogs(serverCwd)}
+                disabled={loading}
+                className="bg-white border border-[#141414] p-3 hover:bg-gray-100 disabled:opacity-30"
+                title="Go to App Root"
+              >
+                <Home size={18} />
               </button>
               <div className="flex items-center gap-4 bg-white border border-[#141414] p-2 pr-4 flex-1">
                 <div className="bg-[#141414] text-white p-2">

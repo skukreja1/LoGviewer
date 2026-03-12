@@ -12,34 +12,41 @@ export interface FileItem {
 
 export class LocalFileService {
   async listFiles(baseDir: string): Promise<FileItem[]> {
-    const entries = await fs.readdir(baseDir, { withFileTypes: true });
-    const items: FileItem[] = await Promise.all(
-      entries.map(async (entry) => {
-        const fullPath = path.join(baseDir, entry.name);
-        try {
-          const stats = await fs.stat(fullPath);
-          return {
-            name: entry.name,
-            path: fullPath,
-            size: stats.size,
-            modifyTime: stats.mtimeMs,
-            type: entry.isDirectory() ? 'directory' : 'file',
-          };
-        } catch (err) {
-          // Skip files we can't access
-          return null as any;
-        }
-      })
-    );
+    console.log(`Listing local files for directory: ${baseDir}`);
+    try {
+      const entries = await fs.readdir(baseDir, { withFileTypes: true });
+      console.log(`Found ${entries.length} entries in ${baseDir}`);
+      const items: FileItem[] = await Promise.all(
+        entries.map(async (entry) => {
+          const fullPath = path.join(baseDir, entry.name);
+          try {
+            const stats = await fs.stat(fullPath);
+            return {
+              name: entry.name,
+              path: fullPath,
+              size: stats.size,
+              modifyTime: stats.mtimeMs,
+              type: entry.isDirectory() ? 'directory' : 'file',
+            };
+          } catch (err) {
+            console.warn(`Could not stat file: ${fullPath}`, err);
+            return null as any;
+          }
+        })
+      );
 
-    return items
-      .filter(item => item !== null)
-      .sort((a, b) => {
-        if (a.type === b.type) {
-          return a.name.localeCompare(b.name);
-        }
-        return a.type === 'directory' ? -1 : 1;
-      });
+      return items
+        .filter(item => item !== null)
+        .sort((a, b) => {
+          if (a.type === b.type) {
+            return a.name.localeCompare(b.name);
+          }
+          return a.type === 'directory' ? -1 : 1;
+        });
+    } catch (err: any) {
+      console.error(`Error listing files in ${baseDir}:`, err);
+      throw new Error(`Failed to list files in ${baseDir}: ${err.message}`);
+    }
   }
 
   async getPreview(filePath: string, lines: number = 200): Promise<string> {

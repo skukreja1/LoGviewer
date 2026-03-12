@@ -35,7 +35,11 @@ const logService = new LogService();
 const localFileService = new LocalFileService();
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    cwd: process.cwd()
+  });
 });
 
 // Auth Middleware
@@ -132,6 +136,7 @@ app.get("/api/logs", authenticate, async (req: any, res) => {
   }
 
   const baseDir = (req.query.path as string) || "/";
+  console.log(`Log request: mode=${localMode ? 'local' : 'ssh'}, path=${baseDir}`);
   
   // Security: Prevent directory traversal
   // We allow absolute paths (starting with / or a drive letter like C:/)
