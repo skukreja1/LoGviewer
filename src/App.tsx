@@ -11,6 +11,7 @@ import {
   ChevronDown, 
   File, 
   Folder,
+  FolderOpen,
   CheckSquare,
   Square,
   Loader2,
@@ -147,7 +148,8 @@ export default function App() {
       if (data.success) {
         setIsConnected(true);
         setLocalMode(true);
-        fetchLogs();
+        setBaseDir('/');
+        fetchLogs('/');
       } else {
         setError(data.error);
       }
@@ -645,8 +647,28 @@ export default function App() {
                   <span className="font-bold uppercase tracking-widest">Scanning remote filesystem...</span>
                 </div>
               ) : filteredLogs.length === 0 ? (
-                <div className="p-20 text-center opacity-30 font-bold uppercase tracking-widest">
-                  No files or folders found in this directory
+                <div className="p-20 flex flex-col items-center justify-center gap-4">
+                  <div className="opacity-30 flex flex-col items-center gap-2">
+                    {search ? <Search size={48} /> : <FolderOpen size={48} />}
+                    <span className="font-bold uppercase tracking-widest">
+                      {search ? `No results for "${search}"` : 'No files or folders found'}
+                    </span>
+                  </div>
+                  {search ? (
+                    <button 
+                      onClick={() => setSearch('')}
+                      className="mt-4 px-8 py-3 border border-[#141414] font-bold uppercase text-xs tracking-widest hover:bg-gray-50 transition-all"
+                    >
+                      Clear Search
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => fetchLogs('/')}
+                      className="mt-4 px-8 py-3 bg-[#141414] text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-all shadow-[4px_4px_0px_0px_rgba(20,20,20,0.2)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                    >
+                      Return to Root (/)
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredLogs.map(log => (

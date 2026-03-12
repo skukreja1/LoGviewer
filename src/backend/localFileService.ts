@@ -41,7 +41,14 @@ export class LocalFileService {
             };
           } catch (err) {
             console.warn(`Could not stat file: ${fullPath}`, err);
-            return null as any;
+            // Fallback to Dirent info if stat fails (e.g. broken symlink or permission issue on stat)
+            return {
+              name: entry.name,
+              path: fullPath,
+              size: 0,
+              modifyTime: Date.now(),
+              type: entry.isDirectory() ? 'directory' : 'file',
+            };
           }
         })
       );
