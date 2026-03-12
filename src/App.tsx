@@ -556,17 +556,59 @@ export default function App() {
               >
                 <Home size={18} />
               </button>
-              <div className="flex items-center gap-4 bg-white border border-[#141414] p-2 pr-4 flex-1">
-                <div className="bg-[#141414] text-white p-2">
+              <div className="flex items-center gap-4 bg-white border border-[#141414] p-2 pr-4 flex-1 overflow-hidden">
+                <div className="bg-[#141414] text-white p-2 flex-shrink-0">
                   <Folder size={18} />
+                </div>
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar whitespace-nowrap flex-1 text-sm font-mono">
+                  {baseDir.split('/').map((part, index, array) => {
+                    const path = array.slice(0, index + 1).join('/') || '/';
+                    const isLast = index === array.length - 1;
+                    if (index === 0 && part === '') {
+                      return (
+                        <React.Fragment key="root">
+                          <button 
+                            onClick={() => fetchLogs('/')}
+                            className="hover:text-orange-600 hover:underline px-1"
+                          >
+                            /
+                          </button>
+                          {array.length > 1 && <span className="opacity-30">/</span>}
+                        </React.Fragment>
+                      );
+                    }
+                    if (part === '') return null;
+                    return (
+                      <React.Fragment key={path}>
+                        <button 
+                          onClick={() => fetchLogs(path)}
+                          className={`hover:text-orange-600 hover:underline px-1 ${isLast ? 'font-bold text-orange-600' : ''}`}
+                        >
+                          {part}
+                        </button>
+                        {!isLast && <span className="opacity-30">/</span>}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
                 <input 
                   type="text" 
-                  className="focus:outline-none font-mono text-sm w-full"
-                  value={baseDir}
-                  onChange={e => setBaseDir(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && fetchLogs()}
+                  className="focus:outline-none font-mono text-sm w-32 border-l border-gray-200 pl-2 ml-2 hidden lg:block"
+                  placeholder="Jump to path..."
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      fetchLogs((e.target as HTMLInputElement).value);
+                      (e.target as HTMLInputElement).value = '';
+                    }
+                  }}
                 />
+                <button 
+                  onClick={() => fetchLogs()}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                  title="Refresh current path"
+                >
+                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                </button>
               </div>
             </div>
 

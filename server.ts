@@ -139,12 +139,13 @@ app.get("/api/logs", authenticate, async (req: any, res) => {
   console.log(`Log request: mode=${localMode ? 'local' : 'ssh'}, path=${baseDir}`);
   
   // Security: Prevent directory traversal
-  // We allow absolute paths (starting with / or a drive letter like C:/)
+  // We allow absolute paths (starting with / or a drive letter like C:/) or UNC paths (\\host)
   const isWindowsPath = /^[a-zA-Z]:\//.test(baseDir);
+  const isUNCPath = baseDir.startsWith("\\\\") || baseDir.startsWith("//");
   const isAbsolutePath = baseDir.startsWith("/");
   
-  if ((!isAbsolutePath && !isWindowsPath) || baseDir.includes("..")) {
-      return res.status(400).json({ error: "Invalid path format. Use absolute paths (e.g. /var/log or C:/logs)" });
+  if ((!isAbsolutePath && !isWindowsPath && !isUNCPath) || baseDir.includes("..")) {
+      return res.status(400).json({ error: "Invalid path format. Use absolute paths (e.g. /var/log, C:/logs, or \\\\hostname\\share)" });
   }
 
   try {

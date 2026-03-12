@@ -13,19 +13,30 @@ export interface FileItem {
 export class LocalFileService {
   async listFiles(baseDir: string): Promise<FileItem[]> {
     console.log(`Listing local files for directory: ${baseDir}`);
+    
+    // Check for UNC paths on non-Windows systems
+    if ((baseDir.startsWith('\\\\') || baseDir.startsWith('//')) && process.platform !== 'win32') {
+      throw new Error(`UNC paths (\\\\hostname) are not natively supported in this Linux environment. Please use the SSH Connection feature to access remote logs.`);
+    }
+
     try {
+      const stats = await fs.stat(baseDir);
+      if (!stats.isDirectory()) {
+        throw new Error(`Path is not a directory: ${baseDir}`);
+      }
+
       const entries = await fs.readdir(baseDir, { withFileTypes: true });
       console.log(`Found ${entries.length} entries in ${baseDir}`);
       const items: FileItem[] = await Promise.all(
         entries.map(async (entry) => {
           const fullPath = path.join(baseDir, entry.name);
           try {
-            const stats = await fs.stat(fullPath);
+            const entryStats = await fs.stat(fullPath);
             return {
               name: entry.name,
               path: fullPath,
-              size: stats.size,
-              modifyTime: stats.mtimeMs,
+              size: entryStats.size,
+              modifyTime: entryStats.mtimeMs,
               type: entry.isDirectory() ? 'directory' : 'file',
             };
           } catch (err) {
@@ -45,6 +56,12 @@ export class LocalFileService {
         });
     } catch (err: any) {
       console.error(`Error listing files in ${baseDir}:`, err);
+      if (err.code === 'ENOENT') {
+        throw new Error(`Directory does not exist: ${baseDir}`);
+      }
+      if (err.code === 'EACCES') {
+        throw new Error(`Permission denied: ${baseDir}`);
+      }
       throw new Error(`Failed to list files in ${baseDir}: ${err.message}`);
     }
   }
