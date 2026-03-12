@@ -14,16 +14,31 @@ export interface SSHConfig {
 export class LogService {
   private async createClient(config: SSHConfig) {
     const sftp = new Client();
-    await sftp.connect({
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password,
-      privateKey: config.privateKey,
-      passphrase: config.passphrase,
-      readyTimeout: 15000, // Increased timeout
-    });
-    return sftp;
+    try {
+      await sftp.connect({
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.password,
+        privateKey: config.privateKey,
+        passphrase: config.passphrase,
+        readyTimeout: 20000,
+        // Windows OpenSSH often works better with these
+        tryKeyboard: true,
+        keepaliveInterval: 10000,
+        keepaliveCountMax: 3,
+      });
+      return sftp;
+    } catch (err: any) {
+      // Provide more context for common errors
+      if (err.message.includes('All configured authentication methods failed')) {
+        throw new Error('Authentication failed. Please check your username and password/key.');
+      }
+      if (err.code === 'ETIMEDOUT' || err.message.includes('timed out')) {
+        throw new Error('Connection timed out. Ensure the host is reachable and the port is correct.');
+      }
+      throw err;
+    }
   }
 
   async testConnection(config: SSHConfig) {

@@ -53,6 +53,7 @@ export default function App() {
     password: '',
   });
   const [isConnected, setIsConnected] = useState(false);
+  const [localMode, setLocalMode] = useState(false);
   const [logs, setLogs] = useState<LogFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,10 +64,20 @@ export default function App() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [baseDir, setBaseDir] = useState('/u01/app/oracle/orpos');
 
-  // Check auth on mount
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  // Check auth and server health on mount
   useEffect(() => {
-    // Simple check if user is in localStorage or similar
-    // For this demo, we'll just rely on API responses
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) setServerStatus('online');
+        else setServerStatus('offline');
+      } catch {
+        setServerStatus('offline');
+      }
+    };
+    checkHealth();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -86,8 +97,8 @@ export default function App() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
-      setError('Connection failed');
+    } catch (err: any) {
+      setError(err.message || 'Connection failed');
     } finally {
       setLoading(false);
     }
@@ -113,6 +124,29 @@ export default function App() {
       }
     } catch (err) {
       setError('SSH Connection failed: Network error or server unreachable from this environment.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLocalConnect = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/local/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsConnected(true);
+        setLocalMode(true);
+        fetchLogs();
+      } else {
+        setError(data.error);
+      }
+    } catch (err) {
+      setError('Failed to enable local mode');
     } finally {
       setLoading(false);
     }
@@ -213,10 +247,11 @@ export default function App() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedPaths.size === filteredLogs.length) {
+    const filesOnly = filteredLogs.filter(l => l.type === 'file');
+    if (selectedPaths.size === filesOnly.length && filesOnly.length > 0) {
       setSelectedPaths(new Set());
     } else {
-      setSelectedPaths(new Set(filteredLogs.map(l => l.path)));
+      setSelectedPaths(new Set(filesOnly.map(l => l.path)));
     }
   };
 
@@ -243,11 +278,17 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md bg-white border border-[#141414] shadow-[8px_8px_0px_0px_rgba(20,20,20,1)] p-8"
         >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-[#141414] flex items-center justify-center text-white">
-              <LogIn size={24} />
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#141414] flex items-center justify-center text-white">
+                <LogIn size={24} />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight uppercase italic">Secure Log Explorer</h1>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight uppercase italic">Secure Log Explorer</h1>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${serverStatus === 'online' ? 'bg-green-500' : serverStatus === 'offline' ? 'bg-red-500' : 'bg-gray-400 animate-pulse'}`} />
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">{serverStatus}</span>
+            </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-evenly flex flex-col gap-6">
@@ -279,6 +320,16 @@ export default function App() {
               </div>
             )}
 
+            {serverStatus === 'offline' && (
+              <button 
+                type="button"
+                onClick={() => window.location.reload()}
+                className="text-[10px] font-bold uppercase tracking-widest text-orange-600 hover:underline text-center"
+              >
+                Server offline. Click to retry connection.
+              </button>
+            )}
+
             <button 
               type="submit" 
               disabled={loading}
@@ -302,14 +353,23 @@ export default function App() {
               <div className="w-10 h-10 bg-[#141414] flex items-center justify-center text-white">
                 <Server size={24} />
               </div>
-              <h1 className="text-3xl font-bold tracking-tighter uppercase italic">Remote Connection</h1>
+              <h1 className="text-3xl font-bold tracking-tighter uppercase italic">Connection Setup</h1>
             </div>
-            <button 
-              onClick={() => setIsLoggedIn(false)}
-              className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest hover:text-orange-600 transition-colors"
-            >
-              <LogOut size={16} /> Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={handleLocalConnect}
+                disabled={loading}
+                className="bg-white border border-[#141414] px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors"
+              >
+                Browse Local Files
+              </button>
+              <button 
+                onClick={() => setIsLoggedIn(false)}
+                className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest hover:text-orange-600 transition-colors"
+              >
+                <LogOut size={16} /> Logout
+              </button>
+            </div>
           </div>
 
           <motion.div 
@@ -365,6 +425,16 @@ export default function App() {
               </div>
 
               <div className="md:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest opacity-50">Initial Directory</label>
+                <input 
+                  type="text" 
+                  className="w-full border-b-2 border-[#141414] py-2 focus:outline-none focus:border-orange-500 font-mono"
+                  value={baseDir}
+                  onChange={e => setBaseDir(e.target.value)}
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest opacity-50">Private Key (Optional PEM)</label>
                 <textarea 
                   className="w-full border-2 border-[#141414] p-4 h-32 font-mono text-sm focus:outline-none focus:border-orange-500"
@@ -397,7 +467,10 @@ export default function App() {
             </form>
           </motion.div>
           <div className="mt-8 bg-white/50 border border-[#141414]/10 p-4 text-[10px] font-bold uppercase tracking-widest opacity-50">
-            Note: This explorer works with any server supporting SFTP (Linux, macOS, Windows with OpenSSH).
+            Note: This explorer works with any server supporting SFTP (Linux, macOS, Windows with OpenSSH). 
+            For Windows, use paths like <code className="bg-gray-200 px-1">C:/Users</code> or <code className="bg-gray-200 px-1">/</code>.
+            <br /><br />
+            <strong>No SSH?</strong> Use "Browse Local Files" to explore files directly on this server or any network shares mounted to it.
           </div>
         </div>
       </div>
@@ -413,8 +486,12 @@ export default function App() {
             <FileText size={28} />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tighter uppercase italic leading-none">Log Explorer</h1>
-            <p className="text-xs font-bold opacity-40 uppercase tracking-widest mt-1">{sshConfig.username}@{sshConfig.host}</p>
+            <h1 className="text-2xl font-black tracking-tighter uppercase italic leading-none">
+              {localMode ? 'Local File Explorer' : 'Log Explorer'}
+            </h1>
+            <p className="text-xs font-bold opacity-40 uppercase tracking-widest mt-1">
+              {localMode ? 'Browsing Server Filesystem' : `${sshConfig.username}@${sshConfig.host}`}
+            </p>
           </div>
         </div>
 
@@ -440,7 +517,10 @@ export default function App() {
           </button>
 
           <button 
-            onClick={() => setIsConnected(false)}
+            onClick={() => {
+              setIsConnected(false);
+              setLocalMode(false);
+            }}
             className="bg-[#141414] text-white px-6 py-2 font-bold uppercase text-xs tracking-widest hover:bg-orange-600 transition-colors"
           >
             Disconnect
@@ -510,7 +590,7 @@ export default function App() {
                 </div>
               ) : filteredLogs.length === 0 ? (
                 <div className="p-20 text-center opacity-30 font-bold uppercase tracking-widest">
-                  No log files found in this directory
+                  No files or folders found in this directory
                 </div>
               ) : (
                 filteredLogs.map(log => (
